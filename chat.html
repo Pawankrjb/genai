@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatAI</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">ChatAI</div>
+      <div class="status" id="status">Ready</div>
+    </header>
+
+    <main class="chat" id="chat" aria-live="polite"></main>
+
+    <form class="composer" id="composer">
+      <input
+        id="message"
+        name="message"
+        type="text"
+        placeholder="Ask a programming question..."
+        autocomplete="off"
+        required
+      />
+      <button id="send" type="submit">Send</button>
+    </form>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const composerEl = document.getElementById('composer');
+    const messageEl = document.getElementById('message');
+    const statusEl = document.getElementById('status');
+
+    function escapeHtml(str) {
+      return str
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '<')
+        .replaceAll('>', '>')
+        .replaceAll('"', '"')
+
+
+        .replaceAll("'", '&#039;');
+
+    }
+
+    function addMessage(role, text) {
+      const wrap = document.createElement('div');
+      wrap.className = `msg ${role}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+
+      bubble.innerHTML = `<div class="text">${escapeHtml(text)}</div>`;
+      wrap.appendChild(bubble);
+      chatEl.appendChild(wrap);
+
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return wrap;
+    }
+
+    function setLoading(isLoading) {
+      composerEl.classList.toggle('loading', isLoading);
+      const sendBtn = document.getElementById('send');
+      sendBtn.disabled = isLoading;
+      statusEl.textContent = isLoading ? 'Thinking...' : 'Ready';
+    }
+
+    composerEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = messageEl.value.trim();
+      if (!message) return;
+
+      addMessage('user', message);
+      messageEl.value = '';
+
+      setLoading(true);
+
+      const thinkingNode = addMessage('assistant', '...');
+      const textNode = thinkingNode.querySelector('.text');
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        textNode.textContent = data.reply || '';
+      } catch (err) {
+        textNode.textContent = `Error: ${err.message}`;
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Initial assistant hint
+    addMessage('assistant', 'Hi! Ask me something about programming and coding.');
+  </script>
+</body>
+</html>
+
